@@ -10,11 +10,11 @@
  * GNU General Public License for more details.
  */
 #include "msm_sensor.h"
-#include "msm_sd.h"
+#include "../msm_sd.h"
 #include "camera.h"
 #include "msm_cci.h"
-#include "msm_camera_io_util.h"
-#include "msm_camera_i2c_mux.h"
+#include "../common/msm_camera_io_util.h"
+#include "io/msm_camera_i2c_mux.h"
 #include <linux/regulator/rpm-smd-regulator.h>
 #include <linux/regulator/consumer.h>
 
