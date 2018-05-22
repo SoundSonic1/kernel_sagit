@@ -1,0 +1,4 @@
+git fetch https://source.codeaurora.org/quic/la/kernel/msm-4.4/ LA.UM.6.4.r1-08500-8x98.0
+git fetch https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/fw-api LA.UM.6.4.r1-08500-8x98.0
+git fetch https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qcacld-3.0 LA.UM.6.4.r1-08500-8x98.0
+git fetch https://source.codeaurora.org/quic/la/platform/vendor/qcom-opensource/wlan/qca-wifi-host-cmn LA.UM.6.4.r1-08500-8x98.0
