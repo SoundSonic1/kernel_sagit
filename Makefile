@@ -401,9 +401,8 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-format-security \
 		   -std=gnu89 $(call cc-option,-fno-PIE) \
 		   -mcpu=cortex-a73.cortex-a53 -mtune=cortex-a73.cortex-a53 \
-		   -Wno-format-truncation -Wno-format-overflow \
-		   -Wno-int-in-bool-context -Wno-misleading-indentation \
-		   -fno-store-merging
+		   -Wno-format-truncation -Wno-int-in-bool-context \
+		   -Wno-misleading-indentation -fno-store-merging
 
 
 KBUILD_AFLAGS_KERNEL :=
