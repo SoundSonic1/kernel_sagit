@@ -405,7 +405,7 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Wno-misleading-indentation -fno-store-merging
 
 # Flash optimization setup
-KBUILD_CFLAGS	+= -O2 -g0 -DNDEBUG
+KBUILD_CFLAGS	+= -O2 -g0
 
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
