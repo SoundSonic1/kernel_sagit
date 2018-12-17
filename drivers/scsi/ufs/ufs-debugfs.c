@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -366,6 +366,7 @@ static const struct file_operations ufsdbg_err_inj_scenario_ops = {
 	.open		= ufsdbg_err_inj_scenario_open,
 	.read		= seq_read,
 	.write		= ufsdbg_err_inj_scenario_write,
+	.release        = single_release,
 };
 
 static int ufsdbg_err_inj_stats_read(struct seq_file *file, void *data)
@@ -407,6 +408,7 @@ static const struct file_operations ufsdbg_err_inj_stats_ops = {
 	.open		= ufsdbg_err_inj_stats_open,
 	.read		= seq_read,
 	.write		= ufsdbg_err_inj_stats_write,
+	.release        = single_release,
 };
 
 static void ufsdbg_setup_fault_injection(struct ufs_hba *hba)
@@ -591,6 +593,7 @@ static const struct file_operations ufsdbg_tag_stats_fops = {
 	.open		= ufsdbg_tag_stats_open,
 	.read		= seq_read,
 	.write		= ufsdbg_tag_stats_write,
+	.release        = single_release,
 };
 
 static int ufsdbg_query_stats_show(struct seq_file *file, void *data)
@@ -662,6 +665,7 @@ static const struct file_operations ufsdbg_query_stats_fops = {
 	.open		= ufsdbg_query_stats_open,
 	.read		= seq_read,
 	.write		= ufsdbg_query_stats_write,
+	.release        = single_release,
 };
 
 static int ufsdbg_err_stats_show(struct seq_file *file, void *data)
@@ -766,6 +770,7 @@ static const struct file_operations ufsdbg_err_stats_fops = {
 	.open		= ufsdbg_err_stats_open,
 	.read		= seq_read,
 	.write		= ufsdbg_err_stats_write,
+	.release        = single_release,
 };
 
 static int ufshcd_init_statistics(struct ufs_hba *hba)
@@ -845,63 +850,14 @@ static int ufsdbg_host_regs_open(struct inode *inode, struct file *file)
 static const struct file_operations ufsdbg_host_regs_fops = {
 	.open		= ufsdbg_host_regs_open,
 	.read		= seq_read,
-};
-
-static int ufsdbg_health_desc_show(struct seq_file *file, void *data)
-{
-	struct ufs_hba *hba = file->private;
-	int err = 0;
-	int buff_len = QUERY_DESC_HEALTH_MAX_SIZE;
-	u8 desc_buf[QUERY_DESC_HEALTH_MAX_SIZE];
-
-	struct desc_field_offset health_desc_field_name[] = {
-		{"bLength",		0x00, BYTE},
-		{"bDescriptorType",	0x01, BYTE},
-		{"bPreEOLInfo",		0x02, BYTE},
-		{"bDeviceLifeTimeEstA",	0x03, BYTE},
-		{"bDeviceLifeTimeEstB",	0x04, BYTE}
-	};
-
-	pm_runtime_get_sync(hba->dev);
-	err = ufshcd_read_health_desc(hba, desc_buf, buff_len);
-	pm_runtime_put_sync(hba->dev);
-
-	if (!err) {
-		int i;
-		struct desc_field_offset *tmp;
-		for (i = 0; i < ARRAY_SIZE(health_desc_field_name); ++i) {
-			tmp = &health_desc_field_name[i];
-			seq_printf(file,
-				   "Health Descriptor[Byte offset 0x%x]: %s = 0x%x\n",
-				   tmp->offset,
-				   tmp->name,
-				   (u8)desc_buf[tmp->offset]);
-		}
-	} else {
-		seq_printf(file, "Reading Health Descriptor failed. err = %d\n",
-			   err);
-	}
-
-	return err;
-}
-
-static int ufsdbg_dump_health_desc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file,
-			   ufsdbg_health_desc_show, inode->i_private);
-}
-
-static const struct file_operations ufsdbg_dump_health_desc = {
-	.open		= ufsdbg_dump_health_desc_open,
-	.read		= seq_read,
-	.release	= single_release,
+	.release        = single_release,
 };
 
 static int ufsdbg_dump_device_desc_show(struct seq_file *file, void *data)
 {
 	int err = 0;
-	int buff_len = QUERY_DESC_DEVICE_MAX_SIZE;
-	u8 desc_buf[QUERY_DESC_DEVICE_MAX_SIZE];
+	int buff_len = QUERY_DESC_DEVICE_DEF_SIZE;
+	u8 desc_buf[QUERY_DESC_DEVICE_DEF_SIZE];
 	struct ufs_hba *hba = (struct ufs_hba *)file->private;
 
 	struct desc_field_offset device_desc_field_name[] = {
@@ -1004,6 +960,49 @@ static int ufsdbg_show_hba_show(struct seq_file *file, void *data)
 			hba->ufs_stats.power_mode_change_cnt);
 	seq_printf(file, "hibern8_exit_cnt = %d\n",
 			hba->ufs_stats.hibern8_exit_cnt);
+
+	seq_printf(file, "pa_err_cnt_total = %d\n",
+			hba->ufs_stats.pa_err_cnt_total);
+	seq_printf(file, "pa_lane_0_err_cnt = %d\n",
+			hba->ufs_stats.pa_err_cnt[UFS_EC_PA_LANE_0]);
+	seq_printf(file, "pa_lane_1_err_cnt = %d\n",
+			hba->ufs_stats.pa_err_cnt[UFS_EC_PA_LANE_1]);
+	seq_printf(file, "pa_line_reset_err_cnt = %d\n",
+			hba->ufs_stats.pa_err_cnt[UFS_EC_PA_LINE_RESET]);
+	seq_printf(file, "dl_err_cnt_total = %d\n",
+			hba->ufs_stats.dl_err_cnt_total);
+	seq_printf(file, "dl_nac_received_err_cnt = %d\n",
+			hba->ufs_stats.dl_err_cnt[UFS_EC_DL_NAC_RECEIVED]);
+	seq_printf(file, "dl_tcx_replay_timer_expired_err_cnt = %d\n",
+	hba->ufs_stats.dl_err_cnt[UFS_EC_DL_TCx_REPLAY_TIMER_EXPIRED]);
+	seq_printf(file, "dl_afcx_request_timer_expired_err_cnt = %d\n",
+	hba->ufs_stats.dl_err_cnt[UFS_EC_DL_AFCx_REQUEST_TIMER_EXPIRED]);
+	seq_printf(file, "dl_fcx_protection_timer_expired_err_cnt = %d\n",
+	hba->ufs_stats.dl_err_cnt[UFS_EC_DL_FCx_PROTECT_TIMER_EXPIRED]);
+	seq_printf(file, "dl_crc_err_cnt = %d\n",
+			hba->ufs_stats.dl_err_cnt[UFS_EC_DL_CRC_ERROR]);
+	seq_printf(file, "dll_rx_buffer_overflow_err_cnt = %d\n",
+		   hba->ufs_stats.dl_err_cnt[UFS_EC_DL_RX_BUFFER_OVERFLOW]);
+	seq_printf(file, "dl_max_frame_length_exceeded_err_cnt = %d\n",
+		hba->ufs_stats.dl_err_cnt[UFS_EC_DL_MAX_FRAME_LENGTH_EXCEEDED]);
+	seq_printf(file, "dl_wrong_sequence_number_err_cnt = %d\n",
+		   hba->ufs_stats.dl_err_cnt[UFS_EC_DL_WRONG_SEQUENCE_NUMBER]);
+	seq_printf(file, "dl_afc_frame_syntax_err_cnt = %d\n",
+		   hba->ufs_stats.dl_err_cnt[UFS_EC_DL_AFC_FRAME_SYNTAX_ERROR]);
+	seq_printf(file, "dl_nac_frame_syntax_err_cnt = %d\n",
+		   hba->ufs_stats.dl_err_cnt[UFS_EC_DL_NAC_FRAME_SYNTAX_ERROR]);
+	seq_printf(file, "dl_eof_syntax_err_cnt = %d\n",
+		   hba->ufs_stats.dl_err_cnt[UFS_EC_DL_EOF_SYNTAX_ERROR]);
+	seq_printf(file, "dl_frame_syntax_err_cnt = %d\n",
+		   hba->ufs_stats.dl_err_cnt[UFS_EC_DL_FRAME_SYNTAX_ERROR]);
+	seq_printf(file, "dl_bad_ctrl_symbol_type_err_cnt = %d\n",
+		   hba->ufs_stats.dl_err_cnt[UFS_EC_DL_BAD_CTRL_SYMBOL_TYPE]);
+	seq_printf(file, "dl_pa_init_err_cnt = %d\n",
+		   hba->ufs_stats.dl_err_cnt[UFS_EC_DL_PA_INIT_ERROR]);
+	seq_printf(file, "dl_pa_error_ind_received = %d\n",
+		   hba->ufs_stats.dl_err_cnt[UFS_EC_DL_PA_ERROR_IND_RECEIVED]);
+	seq_printf(file, "dme_err_cnt = %d\n", hba->ufs_stats.dme_err_cnt);
+
 	return 0;
 }
 
@@ -1015,6 +1014,7 @@ static int ufsdbg_show_hba_open(struct inode *inode, struct file *file)
 static const struct file_operations ufsdbg_show_hba_fops = {
 	.open		= ufsdbg_show_hba_open,
 	.read		= seq_read,
+	.release	= single_release,
 };
 
 static int ufsdbg_dump_device_desc_open(struct inode *inode, struct file *file)
@@ -1026,6 +1026,7 @@ static int ufsdbg_dump_device_desc_open(struct inode *inode, struct file *file)
 static const struct file_operations ufsdbg_dump_device_desc = {
 	.open		= ufsdbg_dump_device_desc_open,
 	.read		= seq_read,
+	.release	= single_release,
 };
 
 static int ufsdbg_power_mode_show(struct seq_file *file, void *data)
@@ -1264,6 +1265,7 @@ static const struct file_operations ufsdbg_power_mode_desc = {
 	.open		= ufsdbg_power_mode_open,
 	.read		= seq_read,
 	.write		= ufsdbg_power_mode_write,
+	.release	= single_release,
 };
 
 static int ufsdbg_dme_read(void *data, u64 *attr_val, bool peer)
@@ -1410,7 +1412,7 @@ static int ufsdbg_req_stats_show(struct seq_file *file, void *data)
 
 	/* Header */
 	seq_printf(file, "\t%-10s %-10s %-10s %-10s %-10s %-10s",
-		"All", "Write", "Read", "Read(urg)", "Write(urg)", "Flush");
+		"All", "Read", "Write", "Read(urg)", "Write(urg)", "Flush");
 
 	spin_lock_irqsave(hba->host->host_lock, flags);
 
@@ -1443,8 +1445,77 @@ static const struct file_operations ufsdbg_req_stats_desc = {
 	.open		= ufsdbg_req_stats_open,
 	.read		= seq_read,
 	.write		= ufsdbg_req_stats_write,
+	.release        = single_release,
 };
 
+static ssize_t ufsdbg_io_stats_write(struct file *filp,
+		const char __user *ubuf, size_t cnt, loff_t *ppos)
+{
+	struct ufs_hba *hba = filp->f_mapping->host->i_private;
+	unsigned long flags;
+
+	spin_lock_irqsave(hba->host->host_lock, flags);
+	hba->ufs_stats.io_read.max_diff_req_count = 0;
+	hba->ufs_stats.io_read.max_diff_total_bytes = 0;
+	hba->ufs_stats.io_readwrite.max_diff_req_count = 0;
+	hba->ufs_stats.io_readwrite.max_diff_total_bytes = 0;
+	hba->ufs_stats.io_write.max_diff_req_count = 0;
+	hba->ufs_stats.io_write.max_diff_total_bytes = 0;
+	spin_unlock_irqrestore(hba->host->host_lock, flags);
+
+	return cnt;
+}
+
+static int ufsdbg_io_stats_show(struct seq_file *file, void *data)
+{
+	struct ufs_hba *hba = (struct ufs_hba *)file->private;
+	unsigned long flags;
+
+	seq_printf(file, "\t\t%-10s %-10s %-10s %-10s %-10s %-10s\n",
+		"ReadCnt", "ReadBytes", "WriteCnt", "WriteBytes", "RWCnt",
+		"RWBytes");
+
+	spin_lock_irqsave(hba->host->host_lock, flags);
+	seq_printf(file,
+		"Started: \t%-10llu %-10llu %-10llu %-10llu %-10llu %-10llu\n",
+		hba->ufs_stats.io_read.req_count_started,
+		hba->ufs_stats.io_read.total_bytes_started,
+		hba->ufs_stats.io_write.req_count_started,
+		hba->ufs_stats.io_write.total_bytes_started,
+		hba->ufs_stats.io_readwrite.req_count_started,
+		hba->ufs_stats.io_readwrite.total_bytes_started);
+	seq_printf(file,
+		"Completed: \t%-10llu %-10llu %-10llu %-10llu %-10llu %-10llu\n",
+		hba->ufs_stats.io_read.req_count_completed,
+		hba->ufs_stats.io_read.total_bytes_completed,
+		hba->ufs_stats.io_write.req_count_completed,
+		hba->ufs_stats.io_write.total_bytes_completed,
+		hba->ufs_stats.io_readwrite.req_count_completed,
+		hba->ufs_stats.io_readwrite.total_bytes_completed);
+	seq_printf(file,
+		"MaxDiff: \t%-10llu %-10llu %-10llu %-10llu %-10llu %-10llu\n",
+		hba->ufs_stats.io_read.max_diff_req_count,
+		hba->ufs_stats.io_read.max_diff_total_bytes,
+		hba->ufs_stats.io_write.max_diff_req_count,
+		hba->ufs_stats.io_write.max_diff_total_bytes,
+		hba->ufs_stats.io_readwrite.max_diff_req_count,
+		hba->ufs_stats.io_readwrite.max_diff_total_bytes);
+	spin_unlock_irqrestore(hba->host->host_lock, flags);
+
+	return 0;
+}
+
+static int ufsdbg_io_stats_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ufsdbg_io_stats_show, inode->i_private);
+}
+
+static const struct file_operations ufsdbg_io_stats_desc = {
+	.open		= ufsdbg_io_stats_open,
+	.read		= seq_read,
+	.write		= ufsdbg_io_stats_write,
+	.release        = single_release,
+};
 
 static int ufsdbg_reset_controller_show(struct seq_file *file, void *data)
 {
@@ -1491,6 +1562,7 @@ static const struct file_operations ufsdbg_reset_controller = {
 	.open		= ufsdbg_reset_controller_open,
 	.read		= seq_read,
 	.write		= ufsdbg_reset_controller_write,
+	.release        = single_release,
 };
 
 static int ufsdbg_clear_err_state(void *data, u64 val)
@@ -1614,11 +1686,6 @@ void ufsdbg_add_debugfs(struct ufs_hba *hba)
 		goto err;
 	}
 
-
-	debugfs_create_file("dump_health_desc", S_IRUSR,
-				    hba->debugfs_files.debugfs_root, hba,
-				    &ufsdbg_dump_health_desc);
-
 	hba->debugfs_files.dump_dev_desc =
 		debugfs_create_file("dump_device_desc", S_IRUSR,
 				    hba->debugfs_files.debugfs_root, hba,
@@ -1679,6 +1746,17 @@ void ufsdbg_add_debugfs(struct ufs_hba *hba)
 	if (!hba->debugfs_files.req_stats) {
 		dev_err(hba->dev,
 			"%s:  failed create req_stats debugfs entry\n",
+			__func__);
+		goto err;
+	}
+
+	hba->debugfs_files.io_stats =
+		debugfs_create_file("io_stats", 0600,
+			hba->debugfs_files.stats_folder, hba,
+			&ufsdbg_io_stats_desc);
+	if (!hba->debugfs_files.io_stats) {
+		dev_err(hba->dev,
+			"%s:  failed create io_stats debugfs entry\n",
 			__func__);
 		goto err;
 	}

@@ -728,6 +728,11 @@ static int ufs_qcom_config_vreg(struct device *dev,
 
 	reg = vreg->reg;
 	if (regulator_count_voltages(reg) > 0) {
+		uA_load = on ? vreg->max_uA : 0;
+		ret = regulator_set_load(vreg->reg, uA_load);
+		if (ret)
+			goto out;
+
 		min_uV = on ? vreg->min_uV : 0;
 		ret = regulator_set_voltage(reg, min_uV, vreg->max_uV);
 		if (ret) {
@@ -735,11 +740,6 @@ static int ufs_qcom_config_vreg(struct device *dev,
 					__func__, vreg->name, ret);
 			goto out;
 		}
-
-		uA_load = on ? vreg->max_uA : 0;
-		ret = regulator_set_load(vreg->reg, uA_load);
-		if (ret)
-			goto out;
 	}
 out:
 	return ret;
@@ -1457,7 +1457,7 @@ static int ufs_qcom_apply_dev_quirks(struct ufs_hba *hba)
 {
 	int err = 0;
 
-	if (hba->dev_quirks & UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME)
+	if (hba->dev_info.quirks & UFS_DEVICE_QUIRK_HOST_PA_SAVECONFIGTIME)
 		err = ufs_qcom_quirk_host_pa_saveconfigtime(hba);
 
 	return err;
@@ -2284,38 +2284,6 @@ out:
 	return err;
 }
 
-static inline int ufs_qcom_configure_lpm(struct ufs_hba *hba, bool enable)
-{
-	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
-	struct phy *phy = host->generic_phy;
-	int err = 0;
-
-	/* The default low power mode configuration is SVS2 */
-	if (!ufs_qcom_cap_svs2(host))
-		goto out;
-
-	if (!((host->hw_ver.major == 0x3) &&
-	    (host->hw_ver.minor == 0x0) &&
-	    (host->hw_ver.step == 0x0)))
-		goto out;
-
-	/*
-	 * The link should be put in hibern8 state before
-	 * configuring the PHY to enter/exit SVS2 mode.
-	 */
-	err = ufshcd_uic_hibern8_enter(hba);
-	if (err)
-		goto out;
-
-	err = ufs_qcom_phy_configure_lpm(phy, enable);
-	if (err)
-		goto out;
-
-	err = ufshcd_uic_hibern8_exit(hba);
-out:
-	return err;
-}
-
 static int ufs_qcom_clk_scale_up_pre_change(struct ufs_hba *hba)
 {
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
@@ -2323,10 +2291,6 @@ static int ufs_qcom_clk_scale_up_pre_change(struct ufs_hba *hba)
 	int err = 0;
 
 	if (!ufs_qcom_cap_qunipro(host))
-		goto out;
-
-	err = ufs_qcom_configure_lpm(hba, false);
-	if (err)
 		goto out;
 
 	if (attr)
@@ -2337,16 +2301,6 @@ static int ufs_qcom_clk_scale_up_pre_change(struct ufs_hba *hba)
 	err = ufs_qcom_set_dme_vs_core_clk_ctrl_clear_div(hba, 150);
 out:
 	return err;
-}
-
-static int ufs_qcom_clk_scale_down_pre_change(struct ufs_hba *hba)
-{
-	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
-
-	if (!ufs_qcom_cap_qunipro(host))
-		return 0;
-
-	return ufs_qcom_configure_lpm(hba, true);
 }
 
 static int ufs_qcom_clk_scale_down_post_change(struct ufs_hba *hba)
@@ -2388,8 +2342,6 @@ static int ufs_qcom_clk_scale_notify(struct ufs_hba *hba,
 	case PRE_CHANGE:
 		if (scale_up)
 			err = ufs_qcom_clk_scale_up_pre_change(hba);
-		else
-			err = ufs_qcom_clk_scale_down_pre_change(hba);
 		break;
 	case POST_CHANGE:
 		if (!scale_up)
@@ -2596,7 +2548,7 @@ bool ufs_qcom_testbus_cfg_is_ok(struct ufs_qcom_host *host,
 int ufs_qcom_testbus_config(struct ufs_qcom_host *host)
 {
 	int reg = 0;
-	int offset = 0, ret = 0, testbus_sel_offset = 19;
+	int offset = -1, ret = 0, testbus_sel_offset = 19;
 	u32 mask = TEST_BUS_SUB_SEL_MASK;
 	unsigned long flags;
 	struct ufs_hba *hba;
@@ -2664,6 +2616,12 @@ int ufs_qcom_testbus_config(struct ufs_qcom_host *host)
 		reg = 0;
 		offset = 0;
 		break;
+	}
+	if (offset < 0) {
+		dev_err(hba->dev, "%s: Bad offset: %d\n", __func__, offset);
+		ret = -EINVAL;
+		spin_unlock_irqrestore(hba->host->host_lock, flags);
+		goto out;
 	}
 	mask <<= offset;
 	spin_unlock_irqrestore(hba->host->host_lock, flags);

@@ -1223,6 +1223,13 @@ promote_secondaries - BOOLEAN
 	promote a corresponding secondary IP address instead of
 	removing all the corresponding secondary IP addresses.
 
+drop_unicast_in_l2_multicast - BOOLEAN
+	Drop any unicast IP packets that are received in link-layer
+	multicast (or broadcast) frames.
+	This behavior (for multicast) is actually a SHOULD in RFC
+	1122, but is disabled by default for compatibility reasons.
+	Default: off (0)
+
 
 tag - INTEGER
 	Allows you to write a number, which can be used as required.
@@ -1671,6 +1678,12 @@ use_optimistic - BOOLEAN
 	address selection algorithm.
 		0: disabled (default)
 		1: enabled
+
+drop_unicast_in_l2_multicast - BOOLEAN
+	Drop any unicast IPv6 packets that are received in link-layer
+	multicast (or broadcast) frames.
+
+	By default this is turned off.
 
 stable_secret - IPv6 address
 	This IPv6 address will be used as a secret to generate IPv6
